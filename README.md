@@ -1,3 +1,8 @@
+
+[installerHeader.bmp](https://github.com/user-attachments/files/28890381/installerHeader.bmp)
+
+
+
 SSS Messenger
 Минималистичный защищённый мессенджер для Windows, Android и веба.
 
