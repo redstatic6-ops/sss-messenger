@@ -1,0 +1,24 @@
+<!-- SVG иконка SSS Messenger -->
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#EC4899;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Фон -->
+  <rect width="256" height="256" rx="60" fill="url(#gradient)"/>
+  
+  <!-- Иконка сообщения -->
+  <g transform="translate(128, 128)">
+    <ellipse cx="0" cy="0" rx="90" ry="80" fill="white" opacity="0.95"/>
+    <circle cx="-30" cy="-10" r="12" fill="#6366F1"/>
+    <circle cx="0" cy="-10" r="12" fill="#8B5CF6"/>
+    <circle cx="30" cy="-10" r="12" fill="#EC4899"/>
+    
+    <!-- Хвостик сообщения -->
+    <path d="M -60 40 L -80 70 L -50 50 Z" fill="white" opacity="0.95"/>
+  </g>
+</svg>

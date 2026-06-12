@@ -1,0 +1,95 @@
+{
+  "name": "sss-messenger",
+  "version": "1.0.0",
+  "description": "Minimalist messenger with Supabase",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "vite build && electron-builder",
+    "electron:publish": "vite build && electron-builder --publish always",
+    "android:sync": "vite build && cap sync android",
+    "android:build": "vite build && cap sync android && cd android && gradlew assembleDebug"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.17",
+    "concurrently": "^8.2.2",
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1",
+    "postcss": "^8.4.33",
+    "tailwindcss": "^3.4.1",
+    "vite": "^5.0.12",
+    "wait-on": "^7.2.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "@supabase/supabase-js": "^2.39.3",
+    "electron-updater": "^6.1.7",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "zustand": "^4.5.0"
+  },
+  "build": {
+    "appId": "com.sss.messenger",
+    "productName": "SSS Messenger",
+    "copyright": "Copyright © 2026 SSS Messenger",
+    "directories": {
+      "output": "dist-electron",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-Setup-${version}.${ext}",
+      "publisherName": "SSS Messenger Team",
+      "verifyUpdateCodeSignature": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SSS Messenger",
+      "menuCategory": "SSS",
+      "runAfterFinish": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeader": "build/installerHeader.bmp",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/uninstallerSidebar.bmp",
+      "uninstallDisplayName": "SSS Messenger ${version}",
+      "deleteAppDataOnUninstall": false,
+      "license": "LICENSE.txt",
+      "language": "1049",
+      "displayLanguageSelector": false,
+      "include": "build/installer.nsh",
+      "warningsAsErrors": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "redstatic6-ops",
+        "repo": "sss-messenger"
+      }
+    ]
+  }
+}
