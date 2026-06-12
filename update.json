@@ -1,6 +1,6 @@
 {
-  "versionCode": 2,
+  "versionCode": 3,
   "versionName": "0.1",
   "apkUrl": "https://github.com/redstatic6-ops/sss-messenger/releases/latest/download/app-debug.apk",
-  "notes": "Sandstorm 0.1"
+  "notes": "Sandstorm 0.1 — багфикс: онлайн-статус, появление новых чатов, вёрстка друзей"
 }

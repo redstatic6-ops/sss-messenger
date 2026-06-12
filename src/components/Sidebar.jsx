@@ -16,6 +16,8 @@ export default function Sidebar({ selectedRoom, onSelectRoom, onOpenSettings, is
   const [groupName, setGroupName] = useState('');
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [pendingCount, setPendingCount] = useState(0);
+  // Тик для пересчёта онлайн-статуса по свежести last_seen
+  const [, setPresenceTick] = useState(0);
 
   // Принудительное обновление списка по сигналу извне (например, после удаления чата).
   useEffect(() => {
@@ -75,10 +77,40 @@ export default function Sidebar({ selectedRoom, onSelectRoom, onOpenSettings, is
       })
       .subscribe();
 
+    // Живой онлайн-статус: ловим UPDATE профилей и обновляем точки «в сети»
+    // в списке чатов и у друзей без перезагрузки приложения.
+    const profilesChannel = supabase
+      .channel(`sidebar-profiles-${user.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles'
+      }, (payload) => {
+        const p = payload.new;
+        setRooms(prev => prev.map(r =>
+          (!r.is_group && r.otherUser?.id === p.id) ? { ...r, otherUser: p } : r
+        ));
+        setUsers(prev => prev.map(u => (u?.id === p.id ? p : u)));
+      })
+      .subscribe();
+
+    // Фолбэк-поллинг: чат, созданный другим пользователем, иногда не приходит
+    // через realtime (RLS на room_members) — периодически обновляем список сами.
+    const pollId = setInterval(() => {
+      loadRooms();
+      loadPendingCount();
+    }, 15000);
+
+    // Тик, чтобы протухший онлайн-статус (по last_seen) гас сам собой.
+    const presenceTickId = setInterval(() => setPresenceTick(t => t + 1), 30000);
+
     return () => {
       window.removeEventListener('focus', handleFocus);
       supabase.removeChannel(roomMembersChannel);
       supabase.removeChannel(friendRequestsChannel);
+      supabase.removeChannel(profilesChannel);
+      clearInterval(pollId);
+      clearInterval(presenceTickId);
     };
   }, [user?.id]);
 

@@ -8,6 +8,7 @@ import {
   requestNotificationPermission,
   ensureNotificationChannel,
   initStatusBar,
+  onAppStateChange,
 } from './lib/native';
 import { checkForAndroidUpdate } from './lib/updater';
 
@@ -48,11 +49,24 @@ function App() {
     const handleBeforeUnload = () => {
       useAuthStore.getState().markOffline();
     };
+    // pagehide надёжнее beforeunload (особенно в мобильных webview)
+    const handlePageHide = () => {
+      useAuthStore.getState().markOffline();
+    };
+
+    // Android/Capacitor: сворачивание приложения → оффлайн, возврат → онлайн
+    onAppStateChange((isActive) => {
+      const store = useAuthStore.getState();
+      if (!store.user) return;
+      if (isActive) store.markOnline();
+      else store.markOffline();
+    });
 
     checkMobile();
     window.addEventListener('resize', checkMobile);
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
 
     // Heartbeat: пока вкладка/приложение активны, раз в 45 сек обновляем
     // is_online + last_seen. Если процесс убили или пропала сеть — обновления
@@ -71,6 +85,7 @@ function App() {
       window.removeEventListener('resize', checkMobile);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
       clearInterval(heartbeatId);
     };
     // initialize стабилен (zustand), поэтому эффект должен выполниться один раз

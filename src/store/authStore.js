@@ -68,6 +68,31 @@ export const useAuthStore = create((set, get) => ({
           .single();
 
         set({ profile });
+
+        // Сразу помечаем «в сети» при входе/обновлении токена — иначе после
+        // свежего логина статус остаётся «не в сети» до первого heartbeat.
+        const nowIso = new Date().toISOString();
+        await supabase
+          .from('profiles')
+          .update({ is_online: true, last_seen: nowIso })
+          .eq('id', session.user.id);
+        if (profile) set({ profile: { ...profile, is_online: true, last_seen: nowIso } });
+
+        // Подписка на изменения своего профиля, если ещё не создана
+        if (!get().profileChannel) {
+          const channel = supabase
+            .channel(`profile:${session.user.id}`)
+            .on('postgres_changes', {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'profiles',
+              filter: `id=eq.${session.user.id}`
+            }, (payload) => {
+              set({ profile: payload.new });
+            })
+            .subscribe();
+          set({ profileChannel: channel });
+        }
       } else {
         // Отписываемся от канала при выходе
         const channel = get().profileChannel;
