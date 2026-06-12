@@ -16,8 +16,9 @@ import { isAndroid } from './native';
 
 // Текущая версия. Держим в синхроне с android/app/build.gradle (versionName/versionCode)
 // и с package.json. Используется как запасной вариант, если App.getInfo недоступен.
-export const APP_VERSION = '1.0';
-export const APP_VERSION_CODE = 1;
+export const APP_VERSION = '0.1';
+export const APP_VERSION_CODE = 2;
+export const APP_CODENAME = 'Sandstorm';
 
 // Манифест последней версии. Лежит в корне репозитория (ветка main).
 const UPDATE_MANIFEST_URL =

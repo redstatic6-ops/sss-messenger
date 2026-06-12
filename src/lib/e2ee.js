@@ -95,6 +95,34 @@ export async function getRoomContentKey(room) {
   return getDmKey(room);
 }
 
+// Возвращает человеко-понятную причину, почему для чата нет ключа шифрования,
+// либо null, если ключ доступен. Используется для понятных сообщений об ошибке.
+export async function diagnoseRoomKey(room) {
+  if (!room) return 'Чат не выбран.';
+  const myPriv = getMyPrivateKey();
+  if (!myPriv) {
+    return 'Шифрование заблокировано на этом устройстве. Откройте приложение и введите пароль шифрования.';
+  }
+  if (room.is_group) {
+    const key = await getGroupKey(room);
+    return key ? null : 'Для этой группы ещё не создан общий ключ шифрования.';
+  }
+  const { userId } = useKeyStore.getState();
+  const { data: members } = await supabase
+    .from('room_members')
+    .select('user_id')
+    .eq('room_id', room.id);
+  const other = (members || []).find((m) => m.user_id !== userId);
+  if (!other) {
+    return 'Не удалось определить собеседника (нет доступа к участникам чата).';
+  }
+  const otherPub = await fetchPublicJwk(other.user_id);
+  if (!otherPub) {
+    return 'Собеседник ещё не настроил шифрование. Попросите его открыть приложение и задать пароль шифрования.';
+  }
+  return null;
+}
+
 export async function ensureGroupRoomKey(roomId, memberIds) {
   const myPriv = getMyPrivateKey();
   if (!myPriv) return;

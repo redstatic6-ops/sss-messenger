@@ -10,6 +10,7 @@ import {
   isEncryptedFile,
   encryptFile,
   decryptFileToUrl,
+  diagnoseRoomKey,
 } from '../lib/e2ee';
 import { notify, appIsActive } from '../lib/native';
 
@@ -28,6 +29,16 @@ export default function ChatWindow({ room, isMobile, onBack, onRoomDeleted, onSt
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [blockState, setBlockState] = useState('none'); // 'none' | 'blockedByMe' | 'blockedMe'
   const messagesEndRef = useRef(null);
+  // Актуальный собеседник без устаревшего замыкания (для realtime-подписки на профили)
+  const otherUserRef = useRef(null);
+  // Кэш профилей отправителей: { [userId]: profile } — чтобы не дёргать БД на каждое сообщение
+  const sendersCacheRef = useRef({});
+
+  // Держим ref собеседника синхронным со state
+  useEffect(() => {
+    otherUserRef.current = otherUser;
+    if (otherUser?.id) sendersCacheRef.current[otherUser.id] = otherUser;
+  }, [otherUser]);
 
 
 
@@ -87,12 +98,24 @@ export default function ChatWindow({ room, isMobile, onBack, onRoomDeleted, onSt
         schema: 'public',
         table: 'profiles'
       }, (payload) => {
-        if (otherUser && payload.new.id === otherUser.id) {
-          setOtherUser(payload.new);
+        const updated = payload.new;
+        // Игнорируем апдейты профилей, не относящихся к этому чату
+        const relevant =
+          updated.id === otherUserRef.current?.id ||
+          !!sendersCacheRef.current[updated.id] ||
+          updated.id === user.id;
+        if (!relevant) return;
+
+        // Обновляем кэш отправителей
+        if (sendersCacheRef.current[updated.id]) {
+          sendersCacheRef.current[updated.id] = updated;
         }
-        // Update messages sender info
+        if (otherUserRef.current && updated.id === otherUserRef.current.id) {
+          setOtherUser(updated);
+        }
+        // Обновляем инфо об отправителе в сообщениях
         setMessages(prev => prev.map(m =>
-          m.sender_id === payload.new.id ? { ...m, sender: payload.new } : m
+          m.sender_id === updated.id ? { ...m, sender: updated } : m
         ));
       })
       .subscribe();
@@ -135,6 +158,20 @@ export default function ChatWindow({ room, isMobile, onBack, onRoomDeleted, onSt
     return out;
   };
 
+  // Профиль отправителя из кэша или из БД (с занесением в кэш)
+  const getSender = async (senderId) => {
+    if (!senderId) return null;
+    const cache = sendersCacheRef.current;
+    if (cache[senderId]) return cache[senderId];
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', senderId)
+      .single();
+    if (data) cache[senderId] = data;
+    return data;
+  };
+
   const loadOtherUser = async () => {
     const { data: members } = await supabase
       .from('room_members')
@@ -152,11 +189,13 @@ export default function ChatWindow({ room, isMobile, onBack, onRoomDeleted, onSt
   const loadMessageWithSender = async (messageId) => {
     const { data } = await supabase
       .from('messages')
-      .select('*, sender:profiles(*)')
+      .select('*')
       .eq('id', messageId)
       .single();
 
     if (data) {
+      // Отправителя берём из кэша (без лишнего join на каждое сообщение)
+      data.sender = await getSender(data.sender_id);
       const hydrated = await hydrateMessage(data);
       // Защита от дублей: realtime INSERT может прийти после первичной загрузки.
       let isNew = false;
@@ -207,6 +246,10 @@ export default function ChatWindow({ room, isMobile, onBack, onRoomDeleted, onSt
       console.log('✅ Загружено сообщений:', data?.length || 0);
 
       if (data) {
+        // Наполняем кэш отправителей из загруженных сообщений
+        data.forEach((m) => {
+          if (m.sender && m.sender_id) sendersCacheRef.current[m.sender_id] = m.sender;
+        });
         const hydrated = await Promise.all(data.map(hydrateMessage));
         setMessages(hydrated);
         scrollToBottom();
@@ -262,7 +305,8 @@ export default function ChatWindow({ room, isMobile, onBack, onRoomDeleted, onSt
     // E2EE: шифруем перед отправкой. В БД уходит только шифртекст.
     const encrypted = await encryptText(room, text);
     if (!encrypted) {
-      alert('Не удалось зашифровать сообщение: нет ключа шифрования для этого чата (собеседник ещё не настроил ключи?).');
+      const reason = await diagnoseRoomKey(room);
+      alert(reason || 'Не удалось зашифровать сообщение: нет ключа шифрования для этого чата.');
       return;
     }
 
@@ -287,7 +331,8 @@ export default function ChatWindow({ room, isMobile, onBack, onRoomDeleted, onSt
       // E2EE: шифруем файл клиентом и заливаем только шифртекст.
       const encrypted = await encryptFile(room, file);
       if (!encrypted) {
-        alert('Не удалось зашифровать файл: нет ключа шифрования для этого чата.');
+        const reason = await diagnoseRoomKey(room);
+        alert(reason || 'Не удалось зашифровать файл: нет ключа шифрования для этого чата.');
         return;
       }
       const { blob, envelope } = encrypted;
@@ -504,7 +549,7 @@ export default function ChatWindow({ room, isMobile, onBack, onRoomDeleted, onSt
                 <button
                   onClick={() => onStartCall && onStartCall(room.id, 'audio', otherUser)}
                   disabled={callStatus !== 'idle'}
-                  className="p-3 bg-dark-elevated hover:bg-brand-success/20 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed group border border-dark-border/50 hover:border-brand-success/50 hover-lift"
+                  className="p-2.5 bg-dark-elevated hover:bg-brand-success/20 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed group border border-dark-border/50 hover:border-brand-success/50 hover-lift"
                   title="Аудиозвонок"
                 >
                   <svg className="w-5 h-5 text-brand-success transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -514,7 +559,7 @@ export default function ChatWindow({ room, isMobile, onBack, onRoomDeleted, onSt
                 <button
                   onClick={() => onStartCall && onStartCall(room.id, 'video', otherUser)}
                   disabled={callStatus !== 'idle'}
-                  className="p-3 bg-dark-elevated hover:bg-brand-primary/20 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed group border border-dark-border/50 hover:border-brand-primary/50 hover-lift"
+                  className="p-2.5 bg-dark-elevated hover:bg-brand-primary/20 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed group border border-dark-border/50 hover:border-brand-primary/50 hover-lift"
                   title="Видеозвонок"
                 >
                   <svg className="w-5 h-5 text-brand-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -528,7 +573,7 @@ export default function ChatWindow({ room, isMobile, onBack, onRoomDeleted, onSt
           <div className="relative">
             <button
               onClick={() => setShowChatMenu((v) => !v)}
-              className="p-3 bg-dark-elevated hover:bg-dark-hover rounded-xl transition-all border border-dark-border/50 hover-lift"
+              className="p-2.5 bg-dark-elevated hover:bg-dark-hover rounded-lg transition-all border border-dark-border/50 hover-lift"
               title="Меню чата"
             >
               <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">

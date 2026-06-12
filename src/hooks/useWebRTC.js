@@ -206,6 +206,37 @@ export function useWebRTC(userId) {
         console.log('🔗 ICE состояние:', pc.iceConnectionState);
       };
 
+      // Устойчивость: следим за общим состоянием соединения.
+      // 'failed'       → пробуем перезапустить ICE (restartIce);
+      // 'disconnected' → даём время восстановиться, иначе мягко завершаем звонок.
+      let disconnectTimer = null;
+      pc.onconnectionstatechange = () => {
+        const st = pc.connectionState;
+        console.log('🔗 Состояние соединения:', st);
+        if (st === 'failed') {
+          try {
+            if (pc.restartIce) pc.restartIce();
+          } catch (e) {
+            console.warn('restartIce', e);
+          }
+        }
+        if (st === 'disconnected') {
+          clearTimeout(disconnectTimer);
+          disconnectTimer = setTimeout(() => {
+            if (
+              pc.connectionState === 'disconnected' ||
+              pc.connectionState === 'failed'
+            ) {
+              console.warn('Соединение потеряно — завершаем звонок');
+              cleanupRef.current();
+            }
+          }, 8000);
+        }
+        if (st === 'connected' || st === 'closed') {
+          clearTimeout(disconnectTimer);
+        }
+      };
+
       peerConnectionRef.current = pc;
       return pc;
     },

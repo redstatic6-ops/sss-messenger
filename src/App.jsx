@@ -3,6 +3,7 @@ import { useAuthStore } from './store/authStore';
 import Auth from './components/Auth';
 import MainLayout from './components/MainLayout';
 import TitleBar from './components/TitleBar';
+import KeyGate from './components/KeyGate';
 import {
   requestNotificationPermission,
   ensureNotificationChannel,
@@ -11,7 +12,7 @@ import {
 import { checkForAndroidUpdate } from './lib/updater';
 
 function App() {
-  const { user, loading, initialize } = useAuthStore();
+  const { user, profile, loading, initialize } = useAuthStore();
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -94,7 +95,13 @@ function App() {
     <div className="h-screen flex flex-col overflow-hidden">
       {isElectron && <TitleBar />}
       <div className="flex-1 overflow-hidden">
-        {user ? <MainLayout isMobile={isMobile} /> : <Auth />}
+        {user ? (
+          <KeyGate user={user} profile={profile}>
+            <MainLayout isMobile={isMobile} />
+          </KeyGate>
+        ) : (
+          <Auth />
+        )}
       </div>
     </div>
   );

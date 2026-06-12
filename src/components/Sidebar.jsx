@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import FriendsPanel from './FriendsPanel';
 import { notify } from '../lib/native';
 import { isOnline as isUserOnline } from '../lib/presence';
+import { APP_CODENAME, APP_VERSION } from '../lib/updater';
 
 export default function Sidebar({ selectedRoom, onSelectRoom, onOpenSettings, isMobile, refreshSignal }) {
   const { user, profile, signOut } = useAuthStore();
@@ -348,6 +349,11 @@ export default function Sidebar({ selectedRoom, onSelectRoom, onOpenSettings, is
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
           </button>
+        </div>
+
+        {/* Кодовое имя версии */}
+        <div className="mt-3 text-center text-[10px] text-gray-500 tracking-wide select-none">
+          {APP_CODENAME} {APP_VERSION}
         </div>
       </div>
 

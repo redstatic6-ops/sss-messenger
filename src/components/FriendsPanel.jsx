@@ -10,6 +10,7 @@ export default function FriendsPanel({ onClose, onSelectUser }) {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -51,6 +52,30 @@ export default function FriendsPanel({ onClose, onSelectUser }) {
       supabase.removeChannel(asFriendChannel);
     };
   }, [user?.id]);
+
+  // Живой поиск по серверу: ищем пользователей по нику через ilike с дебаунсом.
+  // Не зависит от первичной выборки, поэтому ник собеседника находится надёжно.
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q || !user?.id) {
+      setSearchResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .neq('id', user.id)
+        .ilike('username', `%${q}%`)
+        .limit(20);
+      if (!cancelled && data) setSearchResults(data);
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchQuery, user?.id]);
 
   const loadFriends = async () => {
     if (!user?.id) return;
@@ -208,9 +233,16 @@ export default function FriendsPanel({ onClose, onSelectUser }) {
   const friendIds = new Set(friends.map(f => f?.id).filter(Boolean));
   const pendingIds = new Set(pendingRequests.map(r => r?.requester?.id).filter(Boolean));
   const trimmedQuery = searchQuery.trim().toLowerCase();
+  // Объединяем предзагруженный список и live-результаты поиска по серверу.
+  const userPool = (() => {
+    const map = new Map();
+    for (const u of allUsers) map.set(u.id, u);
+    for (const u of searchResults) map.set(u.id, u);
+    return Array.from(map.values());
+  })();
   const filteredUsers = trimmedQuery
-    ? allUsers.filter(u =>
-        u.username.toLowerCase().includes(trimmedQuery) &&
+    ? userPool.filter(u =>
+        (u.username || '').toLowerCase().includes(trimmedQuery) &&
         !friendIds.has(u.id) &&
         !pendingIds.has(u.id)
       )
@@ -246,17 +278,17 @@ export default function FriendsPanel({ onClose, onSelectUser }) {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-dark-border/50 px-3 sm:px-6 gap-1 sm:gap-3">
+        <div className="flex border-b border-dark-border/50 px-2 sm:px-6 gap-0.5 sm:gap-3">
           <button
             onClick={() => setActiveTab('friends')}
-            className={`flex-1 min-w-0 py-3 sm:py-4 text-sm md:text-base font-semibold transition-all relative ${
+            className={`flex-1 min-w-0 overflow-hidden py-3 sm:py-4 text-xs sm:text-sm font-semibold transition-all relative ${
               activeTab === 'friends' 
                 ? 'text-brand-primary' 
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            <span className="flex items-center justify-center gap-2 md:gap-2.5 min-w-0">
-              <svg className="w-4 h-4 hidden md:inline-block flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="flex items-center justify-center gap-1 sm:gap-2 min-w-0 whitespace-nowrap">
+              <svg className="w-4 h-4 hidden xl:inline-block flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
               Друзья
@@ -269,14 +301,14 @@ export default function FriendsPanel({ onClose, onSelectUser }) {
           
           <button
             onClick={() => setActiveTab('pending')}
-            className={`flex-1 min-w-0 py-3 sm:py-4 text-sm md:text-base font-semibold transition-all relative ${
+            className={`flex-1 min-w-0 overflow-hidden py-3 sm:py-4 text-xs sm:text-sm font-semibold transition-all relative ${
               activeTab === 'pending' 
                 ? 'text-brand-primary' 
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            <span className="flex items-center justify-center gap-2 md:gap-2.5 min-w-0">
-              <svg className="w-4 h-4 hidden md:inline-block flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="flex items-center justify-center gap-1 sm:gap-2 min-w-0 whitespace-nowrap">
+              <svg className="w-4 h-4 hidden xl:inline-block flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               Запросы
@@ -291,14 +323,14 @@ export default function FriendsPanel({ onClose, onSelectUser }) {
           
           <button
             onClick={() => setActiveTab('add')}
-            className={`flex-1 min-w-0 py-3 sm:py-4 text-sm md:text-base font-semibold transition-all relative ${
+            className={`flex-1 min-w-0 overflow-hidden py-3 sm:py-4 text-xs sm:text-sm font-semibold transition-all relative ${
               activeTab === 'add' 
                 ? 'text-brand-primary' 
                 : 'text-gray-400 hover:text-white'
             }`}
           >
-            <span className="flex items-center justify-center gap-2 md:gap-2.5 min-w-0">
-              <svg className="w-4 h-4 hidden md:inline-block flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="flex items-center justify-center gap-1 sm:gap-2 min-w-0 whitespace-nowrap">
+              <svg className="w-4 h-4 hidden xl:inline-block flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
               </svg>
               Добавить
@@ -338,24 +370,24 @@ export default function FriendsPanel({ onClose, onSelectUser }) {
                         onClose();
                       }}
                       title="Написать"
-                      className="flex items-center gap-2 p-2.5 sm:px-5 sm:py-2.5 bg-gradient-to-r from-brand-primary to-brand-secondary hover:shadow-glow rounded-xl text-sm font-semibold transition-all transform hover:scale-105"
+                      className="flex items-center gap-2 p-2.5 lg:px-4 lg:py-2.5 bg-gradient-to-r from-brand-primary to-brand-secondary hover:shadow-glow rounded-xl text-sm font-semibold whitespace-nowrap transition-all"
                     >
                       <svg className="w-5 h-5 sm:w-4 sm:h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                       </svg>
-                      <span className="hidden sm:inline">Написать</span>
+                      <span className="hidden lg:inline">Написать</span>
                     </button>
                     <button
                       onClick={() => {
                         if (confirm('Удалить из друзей?')) removeFriend(friend.id);
                       }}
                       title="Удалить"
-                      className="flex items-center gap-2 p-2.5 sm:px-4 sm:py-2.5 bg-dark-elevated hover:bg-brand-danger/20 rounded-xl text-sm font-semibold text-brand-danger border border-brand-danger/30 hover:border-brand-danger transition-all"
+                      className="flex items-center gap-2 p-2.5 lg:px-4 lg:py-2.5 bg-dark-elevated hover:bg-brand-danger/20 rounded-xl text-sm font-semibold whitespace-nowrap text-brand-danger border border-brand-danger/30 hover:border-brand-danger transition-all"
                     >
                       <svg className="w-5 h-5 sm:w-4 sm:h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
-                      <span className="hidden sm:inline">Удалить</span>
+                      <span className="hidden lg:inline">Удалить</span>
                     </button>
                   </div>
                 </div>
@@ -434,6 +466,7 @@ export default function FriendsPanel({ onClose, onSelectUser }) {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Поиск пользователей..."
                     className="input-field !pl-12"
+                    autoFocus
                   />
                 </div>
               </div>

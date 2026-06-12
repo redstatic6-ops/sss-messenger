@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 
+// Ограничения загружаемых изображений (аватар/баннер)
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 МБ
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
 export default function ProfileSettings({ onClose }) {
   const { profile, setProfile } = useAuthStore();
   const [activeTab, setActiveTab] = useState('profile');
@@ -16,9 +20,23 @@ export default function ProfileSettings({ onClose }) {
   const [uploading, setUploading] = useState(false);
 
   const uploadFile = async (file, bucket) => {
+    // Валидация типа и размера до отправки в Storage
+    if (!file.type || !file.type.startsWith('image/')) {
+      alert('Можно загружать только изображения.');
+      return null;
+    }
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      alert('Неподдерживаемый формат. Разрешены: JPEG, PNG, GIF, WebP.');
+      return null;
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      alert('Файл слишком большой: ' + (file.size / 1024 / 1024).toFixed(1) + ' МБ. Максимум — 5 МБ.');
+      return null;
+    }
+
     setUploading(true);
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${profile.id}/${Math.random()}.${fileExt}`;
+    const fileExt = (file.name.split('.').pop() || 'png').toLowerCase();
+    const fileName = `${profile.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
       .from(bucket)
@@ -79,13 +97,13 @@ export default function ProfileSettings({ onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-dark-surface rounded-lg w-full max-w-4xl h-[600px] flex overflow-hidden">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-dark-surface rounded-lg w-full max-w-4xl h-[600px] max-h-[90vh] flex flex-col sm:flex-row overflow-hidden">
         {/* Sidebar */}
-        <div className="w-64 bg-dark-bg p-4 space-y-2">
+        <div className="w-full sm:w-64 bg-dark-bg p-3 sm:p-4 flex sm:flex-col gap-2 overflow-x-auto flex-shrink-0">
           <button
             onClick={() => setActiveTab('profile')}
-            className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+            className={`flex-shrink-0 sm:w-full text-center sm:text-left whitespace-nowrap px-4 py-2 rounded-lg transition-colors ${
               activeTab === 'profile' ? 'bg-blue-600' : 'hover:bg-dark-hover'
             }`}
           >
@@ -93,7 +111,7 @@ export default function ProfileSettings({ onClose }) {
           </button>
           <button
             onClick={() => setActiveTab('appearance')}
-            className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+            className={`flex-shrink-0 sm:w-full text-center sm:text-left whitespace-nowrap px-4 py-2 rounded-lg transition-colors ${
               activeTab === 'appearance' ? 'bg-blue-600' : 'hover:bg-dark-hover'
             }`}
           >
@@ -101,7 +119,7 @@ export default function ProfileSettings({ onClose }) {
           </button>
           <button
             onClick={() => setActiveTab('privacy')}
-            className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+            className={`flex-shrink-0 sm:w-full text-center sm:text-left whitespace-nowrap px-4 py-2 rounded-lg transition-colors ${
               activeTab === 'privacy' ? 'bg-blue-600' : 'hover:bg-dark-hover'
             }`}
           >
@@ -109,7 +127,7 @@ export default function ProfileSettings({ onClose }) {
           </button>
           <button
             onClick={() => setActiveTab('account')}
-            className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+            className={`flex-shrink-0 sm:w-full text-center sm:text-left whitespace-nowrap px-4 py-2 rounded-lg transition-colors ${
               activeTab === 'account' ? 'bg-blue-600' : 'hover:bg-dark-hover'
             }`}
           >
@@ -118,7 +136,7 @@ export default function ProfileSettings({ onClose }) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
           <div className="p-6 border-b border-dark-border flex items-center justify-between">
             <h2 className="text-xl font-semibold">Настройки</h2>
             <button
@@ -131,7 +149,7 @@ export default function ProfileSettings({ onClose }) {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-6 min-h-0">
             {activeTab === 'profile' && (
               <div className="space-y-6">
                 {/* Banner preview */}
@@ -318,7 +336,7 @@ export default function ProfileSettings({ onClose }) {
                 <div className="p-4 bg-red-500/10 border border-red-500/50 rounded-lg">
                   <h3 className="font-medium mb-2 text-red-400">Удалить аккаунт</h3>
                   <p className="text-sm text-gray-400 mb-4">
-                    Это действие необратимо. Все ваши данные будут удалены.
+                    Это действие необратимо. Все ����аши данные будут удалены.
                   </p>
                   <button className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
                     Удалить аккаунт

@@ -89,7 +89,10 @@ export default function MainLayout({ isMobile }) {
   };
 
   return (
-    <div className="flex h-full w-full bg-dark-bg overflow-hidden relative">
+    <div
+      className="flex h-full w-full bg-dark-bg overflow-hidden relative"
+      style={ { paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' } }
+    >
       {/* ... (остальной код фона такой же) ... */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-1/4 w-96 h-96 bg-brand-primary/10 rounded-full blur-3xl animate-pulse-soft"></div>
